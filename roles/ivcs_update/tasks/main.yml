@@ -1,0 +1,41 @@
+---
+- name: 1. Assert that update needed
+  ansible.builtin.import_tasks: assertions.yml
+  vars:
+    stage: "pre-update"
+
+- name: 2. Download new ISOs
+  ansible.builtin.import_tasks: download-isos.yml
+  tags: download
+
+- name: 3. Update media servers
+  ansible.builtin.import_tasks: update-media.yml
+  when: inventory_hostname in groups["media"]
+  tags: update_media
+
+- name: 4. Update main servers - node 1
+  ansible.builtin.import_tasks: update-main.yml
+  when: inventory_hostname == groups["main"][0]
+  tags: update_main
+  vars:
+    db_status_config_line: "2"
+
+- name: 5. Update main servers - node 2
+  ansible.builtin.import_tasks: update-main.yml
+  when: inventory_hostname in groups["main"][1]
+  tags: update_main
+  vars:
+    db_status_config_line: "1"
+
+- name: 6. Assert final db_status
+  ansible.builtin.import_tasks: assertions.yml
+  when: inventory_hostname == groups["main"][0]
+  vars:
+    stage: "final"
+
+- name: 7. Remove db snapshots
+  ansible.builtin.shell:
+    cmd: rm -rf /var/lib/postgresql/9.6/main.*
+    executable: /bin/bash
+  changed_when: true
+  when: inventory_hostname in groups["main"]

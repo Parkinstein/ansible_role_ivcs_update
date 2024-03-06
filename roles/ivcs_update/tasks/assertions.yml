@@ -1,0 +1,54 @@
+---
+- name: "[Pre-update] Run assertions"
+  when: stage == 'pre-update'
+  block:
+    - name: "[Pre-update] - Run iva-cli system version"
+      ansible.builtin.shell:
+        cmd: iva-cli system version 2>&1
+        executable: /bin/bash
+      register: system_version
+      changed_when: false
+
+    - name: "[Pre-update] - Run assertions"
+      ansible.builtin.assert:
+        that:
+          - iso_url is defined
+          - system_version.stdout not in iso_dl_path
+        fail_msg: "Fail: error occured or current version: {{ system_version.stdout }} matches ISO version: {{ iso_dl_path }}"
+        success_msg: "Current version: {{ system_version.stdout }} does not match ISO version: {{ iso_dl_path }}, can continue"
+
+- name: "[Post-update] - Run assertions"
+  when: stage == 'post-update'
+  block:
+    - name: "[Post-update] Run iva-cli system version"
+      ansible.builtin.shell:
+        cmd: iva-cli system version 2>&1
+        executable: /bin/bash
+      register: system_version
+      changed_when: false
+
+    - name: "[Post-update] - Run assertions"
+      ansible.builtin.assert:
+        that:
+          - system_version.stdout in iso_dl_path
+        fail_msg: "Fail: error occured or current version: {{ system_version.stdout }} does not match ISO version: {{ iso_dl_path }}"
+        success_msg: "Current version: {{ system_version.stdout }} matches ISO version: {{ iso_dl_path }}"
+
+- name: "[Final] - Assert cluster db status"
+  when: stage == 'final'
+  block:
+    - name: "[Final] - Get db status"
+      ansible.builtin.shell:
+        cmd: set -o pipefail && crm_mon -1 -A | grep -m 2 ivcs-db-status | awk '{print $4}'
+        executable: /bin/bash
+      changed_when: true
+      register: db_status
+      when: inventory_hostname == groups['main'][0]
+
+    - name: "[Final] - Run assertions"
+      ansible.builtin.assert:
+        that:
+          - db_status.stdout_lines[0] == 'MASTER'
+          - db_status.stdout_lines[1] == 'HOTSTANDBY'
+        success_msg: "{{ db_status.stdout_lines }}"
+      when: inventory_hostname == groups['main'][0]

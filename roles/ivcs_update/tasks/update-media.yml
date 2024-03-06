@@ -1,0 +1,39 @@
+---
+- name: Print iso_path to use
+  ansible.builtin.debug:
+    var: iso_file.stat.path
+
+- name: Execute command sudo iva-cli live save-changes
+  ansible.builtin.shell:
+    cmd: iva-cli live save-changes
+    executable: /bin/bash
+  register: save_changes_output
+  when: iso_file.stat.exists
+  changed_when: true
+
+- name: Show iva-cli output
+  ansible.builtin.debug:
+    msg: "{{ save_changes_output.stdout_lines }}"
+  when: save_changes_output.rc == 0
+
+- name: Execute command sudo iva-cli system update {{ iso_file.stat.path }}
+  ansible.builtin.shell:
+    cmd: sudo iva-cli system update {{ iso_file.stat.path }}
+    executable: /bin/bash
+  when: iso_file.stat.exists and save_changes_output.rc == 0
+  changed_when: true
+  register: system_update_output
+
+- name: Show sudo iva-cli system update output
+  ansible.builtin.debug:
+    msg: "{{ system_update_output.stdout_lines }}"
+  when: system_update_output.rc == 0
+
+- name: Execute command sudo iva-cli system reboot
+  ansible.builtin.reboot:
+    reboot_command: iva-cli system reboot
+
+- name: Run assertions
+  ansible.builtin.import_tasks: assertions.yml
+  vars:
+    stage: "post-update"

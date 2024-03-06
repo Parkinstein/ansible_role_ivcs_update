@@ -1,0 +1,25 @@
+---
+- name: Print base vars
+  ansible.builtin.debug:
+    msg:
+      - "{{ iso_url }}"
+      - "{{ iso_dl_path }}"
+      - "{{ ansible_hostname }}"
+
+- name: Check if ISO file exists
+  ansible.builtin.stat:
+    path: "{{ iso_dl_path }}"
+  register: iso_file
+
+- name: Download media ISO
+  ansible.builtin.get_url:
+    url: "{{ iso_url }}"
+    dest: "{{ iso_dl_path }}"
+    mode: 755
+  when: not iso_file.stat.exists
+  register: dl_result
+
+- name: Get final ISO file path
+  ansible.builtin.stat:
+    path: "{{ iso_dl_path }}"
+  register: iso_file

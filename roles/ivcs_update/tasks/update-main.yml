@@ -1,0 +1,66 @@
+- name: 1 Check ivcs-db-status to be HOTSTANDBY for N0{{ db_status_config_line }}
+  ansible.builtin.shell:
+    cmd: set -o pipefail && crm_mon -1 -A | grep -m 2 ivcs-db-status | awk 'NR=={{ db_status_config_line }} {print $4}'
+    executable: /bin/bash
+  register: db_status_pre_update
+  changed_when: db_status_pre_update.stdout != "HOTSTANDBY"
+
+- name: 2 Run iva-cli live save-changes for {{ ansible_hostname }}
+  ansible.builtin.shell:
+    cmd: iva-cli live save-changes
+    executable: /bin/bash
+  register: save_changes_output
+  changed_when: true
+
+- name: 3 Execute command sudo iva-cli system update {{ iso_file.stat.path }}
+  ansible.builtin.shell:
+    cmd: sudo iva-cli system update {{ iso_file.stat.path }}
+    executable: /bin/bash
+  when: iso_file.stat.exists and save_changes_output.rc == 0
+  changed_when: true
+  register: system_update_output
+
+- name: 4 Run remove from cluster for node {{ ansible_hostname }}
+  when: db_status_pre_update.stdout == "HOTSTANDBY"
+  ansible.builtin.shell:
+    cmd: crm_standby --node {{ ansible_hostname }} --lifetime=forever --update=on
+    executable: /bin/bash
+  changed_when: true
+
+- name: 5 Check ivcs-db-status until it is MASTER  for N0{{ db_status_config_line }}
+  ansible.builtin.shell:
+    cmd: set -o pipefail && sudo crm_mon -1 -A | grep -m 2 ivcs-db-status | awk 'NR=={{ db_status_config_line }} {print $4}'
+    executable: /bin/bash
+  register: db_status_cluster_exclusion
+  until: db_status_cluster_exclusion.stdout == "MASTER"
+  retries: 30
+  delay: 15
+  changed_when: db_status_pre_update is undefined or db_status_pre_update.stdout != "MASTER"
+
+- name: 6 Execute command sudo iva-cli system reboot
+  ansible.builtin.reboot:
+    reboot_command: iva-cli system reboot
+
+- name: 7 Run assertions
+  ansible.builtin.import_tasks: assertions.yml
+  vars:
+    stage: "post-update"
+  tags: assertions
+
+- name: 8 Adding back to cluster for {{ ansible_hostname }}
+  when: db_status_cluster_exclusion.stdout == "MASTER"
+  ansible.builtin.shell:
+    cmd: crm_standby --node {{ ansible_hostname }} --lifetime=forever --update=off
+    executable: /bin/bash
+  changed_when: true
+
+- name: 9 Check ivcs-db-status until it is HOTSTANDBY for {{ ansible_hostname }}
+  when: db_status_cluster_exclusion.stdout == "MASTER"
+  ansible.builtin.shell:
+    cmd: set -o pipefail && crm_mon -1 -A | grep -m 2 ivcs-db-status | awk 'NR=={{ (ansible_hostname | split("-"))[2] }} {print $4}'
+    executable: /bin/bash
+  register: db_status_cluster_inclusion
+  until: db_status_cluster_inclusion.stdout == "HOTSTANDBY"
+  retries: 30
+  delay: 15
+  changed_when: db_status_cluster_exclusion.stdout != "HOTSTANDBY"
