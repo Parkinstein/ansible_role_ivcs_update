@@ -1,0 +1,2 @@
+---
+iso_dl_path: "{{ '/tmp/' + iso_url.split('files=')[1].replace('%2B', '+') }}"
