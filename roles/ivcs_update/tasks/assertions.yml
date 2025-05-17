@@ -4,7 +4,7 @@
   block:
     - name: "[Pre-update] - Run iva-cli system version"
       ansible.builtin.shell:
-        cmd: iva-cli system version 2>&1
+        cmd: sudo iva-cli system version 2>&1
         executable: /bin/bash
       register: system_version
       changed_when: false
@@ -22,7 +22,7 @@
   block:
     - name: "[Post-update] Run iva-cli system version"
       ansible.builtin.shell:
-        cmd: iva-cli system version 2>&1
+        cmd: sudo iva-cli system version 2>&1
         executable: /bin/bash
       register: system_version
       changed_when: false

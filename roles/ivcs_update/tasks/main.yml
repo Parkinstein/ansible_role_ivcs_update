@@ -35,7 +35,7 @@
 
 - name: 7. Remove db snapshots
   ansible.builtin.shell:
-    cmd: rm -rf /var/lib/postgresql/9.6/main.*
+    cmd: rm -rf /var/lib/postgresql/16/main.*
     executable: /bin/bash
   changed_when: true
   when: inventory_hostname in groups["main"]

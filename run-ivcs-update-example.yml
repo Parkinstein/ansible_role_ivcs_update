@@ -2,10 +2,11 @@
 - name: Update IVCS servers
   hosts: all
   become: true
+  become_user: admin
 
   vars:
-    media_iso_url: # put a link to download MEDIA ISO from cloud.iva.ru
-    main_iso_url: # put a link to download MAIN (HEAD) ISO from cloud.iva.ru
+    media_iso_url: 'http://files.ivcs.su/media/iso/ivcs-media-live_3.197.iso'
+    main_iso_url: 'http://files.ivcs.su/ivcs/iso/ivcs-live_24.2.iso'
 
   roles:
     - ivcs_update
